@@ -43,6 +43,22 @@ python app.py
 
 Then open your browser and navigate to `http://127.0.0.1:5000/` (or the address shown in the terminal).
 
+## Deploy to Streamlit Cloud
+
+1. Push this repository to GitHub (already on `main`).
+2. Go to https://streamlit.io/cloud and sign in with your GitHub account.
+3. Create a new app and select the `Vivek-120604/Sentiment_app` repository and the `main` branch.
+4. For the **main file**, set `app.py`.
+5. Leave build command empty; Streamlit Cloud will install dependencies from `requirements.txt`.
+
+Notes & recommendations:
+- This repo includes a Hugging Face `transformers` + `torch` dependency which can make the build large and longer on Streamlit Cloud. If you encounter build or memory issues, either:
+   - Remove `transformers` and `torch` from `requirements.txt` (the app will fall back to the local Keras SimpleRNN model), or
+   - Use the Hugging Face Inference API instead of local `transformers` (set `HF_API_TOKEN` in Streamlit secrets and update `app.py` to call the API).
+- Model artifacts `simple_rnn_imdb.keras` and `word_to_index.pkl` are included in the repo so the app can run without external downloads. If you prefer hosting the model elsewhere, set `MODEL_URL` and `WORD_INDEX_URL` as Streamlit secrets or environment variables.
+
+After creating the app, open the app URL Streamlit provides. If the build fails due to `torch` size, try the first recommendation above.
+
 ## Project Structure
 
 - `app.py` — Main application file.

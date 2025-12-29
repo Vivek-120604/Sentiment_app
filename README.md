@@ -53,8 +53,12 @@ Then open your browser and navigate to `http://127.0.0.1:5000/` (or the address 
 
 Notes & recommendations:
 - This repo includes a Hugging Face `transformers` + `torch` dependency which can make the build large and longer on Streamlit Cloud. If you encounter build or memory issues, either:
-   - Remove `transformers` and `torch` from `requirements.txt` (the app will fall back to the local Keras SimpleRNN model), or
-   - Use the Hugging Face Inference API instead of local `transformers` (set `HF_API_TOKEN` in Streamlit secrets and update `app.py` to call the API).
+- The app prefers a high-accuracy model. To avoid installing `transformers`/`torch` on Streamlit Cloud (large build), the app can call the Hugging Face Inference API. Recommended setup:
+   - Add `HF_API_TOKEN` as a secret in Streamlit (Settings → Secrets) with a Hugging Face API token.
+   - The app will use the HF Inference API when `HF_API_TOKEN` is present, avoiding heavy dependencies and enabling immediate click-to-use deployment.
+   - If you don't provide `HF_API_TOKEN`, the app falls back to the included `simple_rnn_imdb.keras` model.
+
+If you do want to install `transformers`/`torch` locally (not recommended for Streamlit Cloud), add them to `requirements.txt`.
 - Model artifacts `simple_rnn_imdb.keras` and `word_to_index.pkl` are included in the repo so the app can run without external downloads. If you prefer hosting the model elsewhere, set `MODEL_URL` and `WORD_INDEX_URL` as Streamlit secrets or environment variables.
 
 After creating the app, open the app URL Streamlit provides. If the build fails due to `torch` size, try the first recommendation above.

@@ -63,6 +63,15 @@ If you do want to install `transformers`/`torch` locally (not recommended for St
 
 After creating the app, open the app URL Streamlit provides. If the build fails due to `torch` size, try the first recommendation above.
 
+### Setting `HF_API_TOKEN` (exact steps)
+
+1. Go to your Streamlit Cloud dashboard and open the app you created for this repo.
+2. Click **Settings** (gear icon) → **Secrets** (or "Settings & secrets").
+3. Add a new secret with key `HF_API_TOKEN` and value set to your Hugging Face API token (starts with `hf_...`).
+4. Save the secret and click **Deploy** (or re-run) to pick up the secret in the running app.
+
+Note: Do NOT commit your real `HF_API_TOKEN` to the repository. Use the `secrets` UI. A template is provided at `.streamlit/secrets_template.toml` for local reference.
+
 ## Project Structure
 
 - `app.py` — Main application file.

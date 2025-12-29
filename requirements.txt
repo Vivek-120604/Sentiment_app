@@ -3,3 +3,4 @@ gradio
 numpy
 streamlit
 requests
+scikit-learn

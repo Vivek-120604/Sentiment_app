@@ -90,6 +90,20 @@ def load_resources():
 
 model, word_to_index = load_resources()
 
+# Load lightweight TF-IDF + LogisticRegression fallback if present
+FALLBACK_VECT = None
+FALLBACK_CLF = None
+try:
+    import pickle
+    if os.path.exists('fallback_vect.pkl') and os.path.exists('fallback_clf.pkl'):
+        with open('fallback_vect.pkl','rb') as f:
+            FALLBACK_VECT = pickle.load(f)
+        with open('fallback_clf.pkl','rb') as f:
+            FALLBACK_CLF = pickle.load(f)
+except Exception:
+    FALLBACK_VECT = None
+    FALLBACK_CLF = None
+
 hf_sentiment = None
 
 if model is None or word_to_index is None:
@@ -115,15 +129,29 @@ else:
             else:
                 hf_fallback = True
 
-            if hf_fallback:
+                if hf_fallback:
                 # simple tokenization: keep alphanumerics and apostrophes
                 import re
                 tokens = re.findall(r"\w+'?\w+|\w+", user_input.lower())
                 # map tokens to shifted indices; unknown -> 2 (`<UNK>`)
                 indexed = [word_to_index.get(w, 2) for w in tokens]
+                # cap indices to the model's MAX_FEATURES (words outside vocab -> <UNK>=2)
+                indexed = [i if i < 10000 else 2 for i in indexed]
+                # prepend START token to align with training sequences
+                indexed = [1] + indexed
                 padded = sequence.pad_sequences([indexed], maxlen=MAX_LEN)
                 pred = model.predict(padded, verbose=0)
                 score = float(pred[0][0])
                 sentiment = 'Positive' if score > 0.5 else 'Negative'
-                st.write(f'Prediction score: {score:.4f} (model: Keras SimpleRNN)')
-                st.write(f'Predicted sentiment: {sentiment}')
+                    st.write(f'Prediction score: {score:.4f} (model: Keras SimpleRNN)')
+                    st.write(f'Predicted sentiment: {sentiment}')
+                    # If Keras returns near-zero biased negative, and a fallback model is available, use it
+                    if score < 0.3 and FALLBACK_VECT is not None and FALLBACK_CLF is not None:
+                        try:
+                            vec = FALLBACK_VECT.transform([user_input])
+                            fb_pred = FALLBACK_CLF.predict_proba(vec)[0][1]
+                            fb_label = 'Positive' if fb_pred > 0.5 else 'Negative'
+                            st.write('\nFallback (TF-IDF+LogReg) score: {:.4f}'.format(fb_pred))
+                            st.write('Fallback predicted sentiment: {}'.format(fb_label))
+                        except Exception:
+                            pass

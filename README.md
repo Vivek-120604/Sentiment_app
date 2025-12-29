@@ -1,103 +1,129 @@
-# Sentiment_app
 
-Sentiment_app is a web application designed to analyze and classify the sentiment of user-entered text as positive, negative, or neutral. It uses natural language processing (NLP) and machine learning techniques to provide insights on textual data.
+   
+# Sentiment_app — Technical Overview
 
-## Features
+This repository demonstrates practical approaches to text sentiment classification using lightweight and experimental models. It contains a saved Keras-based RNN model for offline inference, scripts for training/evaluation, and small experiments with transformer-based inference.
 
-- **Sentiment Analysis:** Classifies input text into positive, negative, or neutral sentiment.
-- **User-friendly Interface:** Simple and intuitive UI for entering text and viewing results.
-- **Real-time Feedback:** Get instant sentiment results as you type or submit text.
-- **Visualization:** Graphical representation of sentiment trends (if implemented).
+This README focuses on the algorithms, preprocessing, training techniques, inference modes, and how the included scripts use them.
 
-## Getting Started
+## Algorithms & Techniques used
 
-### Prerequisites
+- Embedding layers: maps integer token ids to dense vectors (learned embeddings) to represent words in a low-dimensional continuous space.
+- Recurrent neural networks (RNNs): a compact sequence model (SimpleRNN / GRU / LSTM family) used in `simple_rnn_imdb.keras` to model order and temporal dependencies in text sequences.
+- Sequence preprocessing: tokenization, integer encoding (word→index), sequence truncation/padding to fixed length, and optional out-of-vocabulary handling.
+- Word-index mapping: a `word_to_index` style lookup is used to encode raw text into model-ready sequences.
+- Training methods: cross-entropy loss for classification, optimizer (e.g., Adam), early stopping and model checkpointing to avoid overfitting, and class-balanced sampling for skewed datasets if required.
+- Evaluation metrics: accuracy, precision, recall, F1-score, and confusion matrices computed by `evaluate_model.py` on held-out test data.
+- Model persistence: Keras `.keras` model saving and loading for reproducible inference and deployment.
+- Transformer experiments: lightweight calls and test harnesses in `test_transformer.py` demonstrating how to swap in transformer encoders (from `transformers`) for higher accuracy when resources permit.
+- External inference option: integration with the Hugging Face Inference API for using large transformer models without local `transformers`/`torch` installs (controlled via `HF_API_TOKEN`).
 
-- Python 3.x
-- Required Python packages (see [requirements.txt](requirements.txt) if available)
+## Files and their roles
 
-### Installation
+- `app.py` — main web UI / demo entry. May be implemented with Streamlit or Flask to let users enter text and view predicted sentiment.
+- `debug_inference.py` — small script to run quick local inferences against the included model; useful for sanity checks and examples.
+- `evaluate_model.py` — runs evaluation on sample/test datasets; reports accuracy and other metrics and can save confusion matrices.
+- `train_and_save.py` — training script that builds the model (embedding + RNN layers), trains on a dataset (e.g., IMDB), and saves the trained model to `simple_rnn_imdb.keras`.
+- `train_fallback.py` — alternate training/fallback configuration (smaller model or alternate hyperparameters) to provide a lightweight option for constrained environments.
+- `test_transformer.py` — experimental transformer-based example demonstrating how to switch from an RNN to a transformer encoder for inference/training.
+- `simple_rnn_imdb.keras` — included trained Keras model for offline inference.
+- `requirements.txt` — Python dependencies used by the project.
+- `sample_data/` — small CSVs and datasets for quick experiments and evaluation.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Vivek-120604/Sentiment_app.git
-   cd Sentiment_app
-   ```
-2. (Optional) Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Typical data preprocessing pipeline
 
-### Usage
+1. Normalize text (lowercasing, optional punctuation removal).
+2. Tokenize text into words or subwords.
+3. Map tokens to integers via a `word_index` dictionary (unknown tokens map to an OOV id).
+4. Pad or truncate sequences to a fixed `max_len` (e.g. 200 tokens).
+5. Batch and feed into model; embedding layer performs lookup to dense vectors and the RNN consumes the sequence.
 
-You can run the application locally:
+Code sketch (preprocessing):
+
+```python
+# tokenize + map to ints
+sequence = [word_index.get(w, oov_id) for w in tokenizer(text)]
+sequence = pad_sequences([sequence], maxlen=MAX_LEN)
+pred = model.predict(sequence)
+```
+
+## How to run (commands)
+
+Install dependencies and create a virtual environment:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Run the app locally (Streamlit or Flask depending on `app.py` implementation):
 
 ```bash
 python app.py
+# or if app uses Streamlit
+streamlit run app.py
 ```
 
-Then open your browser and navigate to `http://127.0.0.1:5000/` (or the address shown in the terminal).
+Quick inference example:
 
-## Deploy to Streamlit Cloud
+```bash
+python debug_inference.py --text "I loved the movie, it was fantastic"
+```
 
-1. Push this repository to GitHub (already on `main`).
-2. Go to https://streamlit.io/cloud and sign in with your GitHub account.
-3. Create a new app and select the `Vivek-120604/Sentiment_app` repository and the `main` branch.
-4. For the **main file**, set `app.py`.
-5. Leave build command empty; Streamlit Cloud will install dependencies from `requirements.txt`.
+Evaluate the model on sample data:
 
-Notes & recommendations:
-- This repo includes a Hugging Face `transformers` + `torch` dependency which can make the build large and longer on Streamlit Cloud. If you encounter build or memory issues, either:
-- The app prefers a high-accuracy model. To avoid installing `transformers`/`torch` on Streamlit Cloud (large build), the app can call the Hugging Face Inference API. Recommended setup:
-   - Add `HF_API_TOKEN` as a secret in Streamlit (Settings → Secrets) with a Hugging Face API token.
-   - The app will use the HF Inference API when `HF_API_TOKEN` is present, avoiding heavy dependencies and enabling immediate click-to-use deployment.
-   - If you don't provide `HF_API_TOKEN`, the app falls back to the included `simple_rnn_imdb.keras` model.
+```bash
+python evaluate_model.py --data sample_data/mnist_test.csv
+```
 
-If you do want to install `transformers`/`torch` locally (not recommended for Streamlit Cloud), add them to `requirements.txt`.
-- Model artifacts `simple_rnn_imdb.keras` and `word_to_index.pkl` are included in the repo so the app can run without external downloads. If you prefer hosting the model elsewhere, set `MODEL_URL` and `WORD_INDEX_URL` as Streamlit secrets or environment variables.
+Train a new model (will create a new saved model file):
 
-After creating the app, open the app URL Streamlit provides. If the build fails due to `torch` size, try the first recommendation above.
+```bash
+python train_and_save.py --epochs 10 --batch-size 64
+```
 
-### Setting `HF_API_TOKEN` (exact steps)
+## Inference modes (local vs remote)
 
-1. Go to your Streamlit Cloud dashboard and open the app you created for this repo.
-2. Click **Settings** (gear icon) → **Secrets** (or "Settings & secrets").
-3. Add a new secret with key `HF_API_TOKEN` and value set to your Hugging Face API token (starts with `hf_...`).
-4. Save the secret and click **Deploy** (or re-run) to pick up the secret in the running app.
+- Local Keras model: the default path if `simple_rnn_imdb.keras` is present — fast and offline but limited by model capacity.
+- Transformer / HF API: for higher accuracy, use `transformers` locally (requires `torch`), or call Hugging Face Inference API by setting `HF_API_TOKEN`.
 
-Note: Do NOT commit your real `HF_API_TOKEN` to the repository. Use the `secrets` UI. A template is provided at `.streamlit/secrets_template.toml` for local reference.
+To use Hugging Face Inference API (no heavy local dependencies):
 
-## Project Structure
+```bash
+export HF_API_TOKEN="hf_..."
+```
 
-- `app.py` — Main application file.
-- `templates/` — HTML templates for the web interface.
-- `static/` — CSS, JS, and image files.
-- `model/` — Trained sentiment analysis models (if any).
-- `requirements.txt` — List of required Python packages.
+Then the app will route requests to the HF inference endpoint when the token is present.
 
-## Contributing
+## Training notes & best practices
 
-Contributions are welcome! To contribute:
+- Use a validation split and early stopping to prevent overfitting.
+- Save the `word_index`/tokenizer together with the model so inference preserves the same encoding.
+- Track experiments (hyperparameters, random seed) for reproducibility.
+- For small datasets, prefer lower-capacity models (small RNN or lightweight transformer) to avoid overfitting.
 
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature-name`)
-3. Commit your changes
-4. Push to the branch (`git push origin feature-name`)
-5. Open a pull request
+## Metrics and evaluation
 
-## License
+- Primary metrics: accuracy, precision, recall, F1.
+- Use confusion matrices to inspect per-class errors and tune class weights if necessary.
 
-This project is licensed under the [MIT License](LICENSE).
+## Extending the project
 
-## Contact
+- Swap the embedding + RNN stack for a transformer encoder in `test_transformer.py` to compare performance.
+- Add a `Dockerfile` for reproducible deployments.
+- Add a unit test suite and CI pipeline to run `evaluate_model.py` and `debug_inference.py` in CI.
 
-For questions, feedback, or collaboration, please contact [Vivek-120604](https://github.com/Vivek-120604).
+## Security & secrets
+
+- Never commit `HF_API_TOKEN` to the repo. Use Streamlit secrets or environment variables for deployments.
+
+## Where to look next
+
+- Try `python debug_inference.py` to confirm local inference works.
+- Run `python evaluate_model.py` to see metrics on the sample data.
+- Inspect `train_and_save.py` to see the exact model architecture and hyperparameters used to create `simple_rnn_imdb.keras`.
 
 ---
 
-*Happy Sentiment Analyzing!*
+_This README replaces the previous high-level summary with a concise technical reference describing algorithms and usage._

@@ -1,38 +1,44 @@
-import gradio as gr
+import streamlit as st
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import sequence
 import pickle
 
-# Define max_len
-max_len = 500
+# Configuration
+MAX_LEN = 500
+MODEL_PATH = 'simple_rnn_imdb.keras'
+WORD_INDEX_PATH = 'word_to_index.pkl'
 
-# Load the saved model
-model = load_model('simple_rnn_imdb_lstm_tanh.keras')
+st.title('IMDB Movie Review Sentiment Analysis')
 
-# Load the word index
-with open('indexed_word_dictionary.pkl', 'rb') as f:
-    word_to_index = pickle.load(f)
+@st.cache_resource
+def load_resources():
+    try:
+        model = load_model(MODEL_PATH)
+    except Exception as e:
+        model = None
+    try:
+        with open(WORD_INDEX_PATH, 'rb') as f:
+            word_to_index = pickle.load(f)
+    except Exception as e:
+        word_to_index = None
+    return model, word_to_index
 
-def preprocess_text(text, word_to_index, max_len):
-   words = text.lower().split()
-   encoded_review = [word_to_index.get(word, 3) for word in words]
-   padded_review = sequence.pad_sequences([encoded_review], maxlen=max_len)
-   return padded_review
+model, word_to_index = load_resources()
 
-def predict_sentiment(text_input):
-    preprocessed_text = preprocess_text(text_input, word_to_index, max_len)
-    prediction = model.predict(preprocessed_text, verbose=0) # Added verbose=0 to suppress output
-    sentiment = 'Positive' if prediction[0] >= 0.5 else 'Negative'
-    return sentiment
-
-# Create the Gradio interface
-iface = gr.Interface(
-    fn=predict_sentiment,
-    inputs=gr.Textbox(lines=5, placeholder='Enter your movie review here...'),
-    outputs='text',
-    title='IMDB Movie Review Sentiment Analysis with LSTM (Tanh)',
-    description='Enter a movie review to classify its sentiment as Positive or Negative using an LSTM model with Tanh activation.'
-)
-
-# Launch the Gradio app
-iface.launch(share=True)
+if model is None or word_to_index is None:
+    st.error('Model or word index not found. Ensure `simple_rnn_imdb.keras` and `word_to_index.pkl` exist in the app directory.')
+else:
+    st.write('Enter a movie review to predict its sentiment (Positive or Negative).')
+    user_input = st.text_area('Enter your review here:')
+    if st.button('Predict'):
+        if user_input.strip():
+            words = user_input.lower().split()
+            indexed = [word_to_index.get(w, 3) for w in words]
+            padded = sequence.pad_sequences([indexed], maxlen=MAX_LEN)
+            pred = model.predict(padded, verbose=0)
+            score = float(pred[0][0])
+            sentiment = 'Positive' if score > 0.5 else 'Negative'
+            st.write(f'Prediction score: {score:.4f}')
+            st.write(f'Predicted sentiment: {sentiment}')
+        else:
+            st.write('Please enter a review to predict.')
